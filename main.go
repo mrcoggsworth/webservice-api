@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type fooHandler struct {
@@ -70,6 +71,7 @@ func init() {
 		log.Fatal(err)
 	}
 }
+
 func getNextID() int {
 	highestId := -1
 	for _, product := range productList {
@@ -179,40 +181,52 @@ func productsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (f *fooHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte(f.Message))
-}
+// func (f *fooHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+// 	w.Write([]byte(f.Message))
+// }
 
-func barHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("This is from the bar handler function...\n"))
-	fs := foo{Message: "Hello from Bar struct", Name: "Chris", SurName: "Scogin", Age: 32}
+// func barHandler(w http.ResponseWriter, r *http.Request) {
+// 	w.Write([]byte("This is from the bar handler function...\n"))
+// 	fs := foo{Message: "Hello from Bar struct", Name: "Chris", SurName: "Scogin", Age: 32}
 
-	bs, err := json.Marshal(&fs)
-	if err != nil {
-		fmt.Println(err)
-	}
-	w.Write(bs)
+// 	bs, err := json.Marshal(&fs)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 	}
+// 	w.Write(bs)
 
-	f := foo{}
+// 	f := foo{}
 
-	if err := json.Unmarshal(bs, &f); err != nil {
-		fmt.Println(err)
-	}
+// 	if err := json.Unmarshal(bs, &f); err != nil {
+// 		fmt.Println(err)
+// 	}
 
-	fmt.Println(f.Message, "My name is", f.Name, f.SurName, "and I am", f.Age, "years old...")
-	fmt.Println(string(bs))
+// 	fmt.Println(f.Message, "My name is", f.Name, f.SurName, "and I am", f.Age, "years old...")
+// 	fmt.Println(string(bs))
+// }
+
+func middlewareHandler(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Before Handler function; Middleware logging start...")
+		start := time.Now()
+		handler.ServeHTTP(w, r)
+		fmt.Printf("Handler function is complete at time: %s\n", time.Since(start))
+	})
 }
 
 func main() {
 
-	fh := fooHandler{
-		Message: "Hello from Go!",
-	}
+	// fh := fooHandler{
+	// 	Message: "Hello from Go!",
+	// }
 
-	http.HandleFunc("/products", productsHandler)
-	http.HandleFunc("/products/", productHandler)
-	http.Handle("/foo", &fh)
-	http.HandleFunc("/bar", barHandler)
+	productItemHandler := http.HandlerFunc(productHandler)
+	productsListHandler := http.HandlerFunc(productsHandler)
+
+	http.Handle("/products", middlewareHandler(productsListHandler))
+	http.Handle("/products/", middlewareHandler(productItemHandler))
+	// http.Handle("/foo", &fh)
+	// http.HandleFunc("/bar", barHandler)
 
 	if err := http.ListenAndServe(":5000", nil); err != nil {
 		fmt.Println(err)
